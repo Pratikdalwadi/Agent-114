@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, FileText, AlertCircle, CheckCircle, Sparkles, Target, Brain, Eye } from 'lucide-react';
+import { Upload, FileText, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Sparkles, Target, Brain, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import PDFProcessor, { PageData } from './PDFProcessor';
 import EnhancedPDFProcessor from './EnhancedPDFProcessor';
