@@ -178,6 +178,12 @@ const EnhancedPDFProcessor = ({
               height: textHeight / canvas.height,
             };
 
+            // Ensure normalized coordinates are properly bounded
+            normalizedBBox.x = Math.max(0, Math.min(normalizedBBox.x, 1));
+            normalizedBBox.y = Math.max(0, Math.min(normalizedBBox.y, 1));
+            normalizedBBox.width = Math.max(0.001, Math.min(normalizedBBox.width, 1 - normalizedBBox.x));
+            normalizedBBox.height = Math.max(0.001, Math.min(normalizedBBox.height, 1 - normalizedBBox.y));
+
             const word: Word = {
               text: item.str,
               bbox: normalizedBBox,
@@ -218,6 +224,10 @@ const EnhancedPDFProcessor = ({
               width: Math.max(0.001, Math.min((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width, 1)),
               height: Math.max(0.001, Math.min((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height, 1)),
             };
+
+            // Ensure width and height don't exceed page bounds
+            normalizedBBox.width = Math.min(normalizedBBox.width, 1 - normalizedBBox.x);
+            normalizedBBox.height = Math.min(normalizedBBox.height, 1 - normalizedBBox.y);
 
             const word: Word = {
               text: ocrWord.text,
@@ -831,11 +841,15 @@ const EnhancedPDFProcessor = ({
           if (ocrWord.text.trim() && ocrWord.bbox) {
             // Normalize coordinates to [0,1] range
             const normalizedBBox: BoundingBox = {
-              x: ocrWord.bbox.x0 / canvas.width,
-              y: ocrWord.bbox.y0 / canvas.height,
-              width: (ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width,
-              height: (ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height,
+              x: Math.max(0, Math.min(ocrWord.bbox.x0 / canvas.width, 1)),
+              y: Math.max(0, Math.min(ocrWord.bbox.y0 / canvas.height, 1)),
+              width: Math.max(0.001, Math.min((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width, 1)),
+              height: Math.max(0.001, Math.min((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height, 1)),
             };
+
+            // Ensure width and height don't exceed page bounds
+            normalizedBBox.width = Math.min(normalizedBBox.width, 1 - normalizedBBox.x);
+            normalizedBBox.height = Math.min(normalizedBBox.height, 1 - normalizedBBox.y);
 
             const word: Word = {
               text: ocrWord.text,
@@ -853,10 +867,10 @@ const EnhancedPDFProcessor = ({
               text: ocrWord.text,
               pageNumber: pageNumber,
               geometry: {
-                x: ocrWord.bbox.x0,
-                y: ocrWord.bbox.y0,
-                w: ocrWord.bbox.x1 - ocrWord.bbox.x0,
-                h: ocrWord.bbox.y1 - ocrWord.bbox.y0,
+                x: Math.max(0, Math.min((ocrWord.bbox.x0 / canvas.width) * 100, 100)),
+                y: Math.max(0, Math.min((ocrWord.bbox.y0 / canvas.height) * 100, 100)),
+                w: Math.max(0.1, Math.min(((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width) * 100, 100)),
+                h: Math.max(0.1, Math.min(((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height) * 100, 100)),
               },
             };
 
@@ -1108,10 +1122,10 @@ const EnhancedPDFProcessor = ({
                   text: word.text.trim(),
                   pageNumber: page.pageNumber,
                   geometry: {
-                    x: Math.max(0, Math.min(word.bbox.x * 100, 100)), // Convert normalized (0-1) to percentage (0-100)
-                    y: Math.max(0, Math.min(word.bbox.y * 100, 100)), // Convert normalized (0-1) to percentage (0-100) 
-                    w: Math.max(0.1, Math.min(word.bbox.width * 100, 100)), // Convert normalized (0-1) to percentage (0-100)
-                    h: Math.max(0.1, Math.min(word.bbox.height * 100, 100)), // Convert normalized (0-1) to percentage (0-100)
+                    x: word.bbox.x * 100, // Convert normalized (0-1) to percentage (0-100)
+                    y: word.bbox.y * 100, // Convert normalized (0-1) to percentage (0-100) 
+                    w: word.bbox.width * 100, // Convert normalized (0-1) to percentage (0-100)
+                    h: word.bbox.height * 100, // Convert normalized (0-1) to percentage (0-100)
                   },
                 };
 

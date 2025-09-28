@@ -120,14 +120,16 @@ export default function TextChunkHighlighter({
     setHoveredChunk(chunkId);
     if (chunkId) {
       const processedChunk = processedChunks.find(pc => pc.chunk.chunk_id === chunkId);
-      console.log('🎯 TextChunkHighlighter: Hovering chunk', {
-        chunkId,
-        hasProcessedChunk: !!processedChunk,
-        grounding: processedChunk?.grounding,
-        pixelCoordinates: processedChunk?.pixelCoordinates,
-        isVisible: processedChunk?.isVisible
-      });
       if (processedChunk) {
+        console.log('🎯 TextChunkHighlighter: Hovering chunk', {
+          chunkId,
+          text: processedChunk.chunk.text.substring(0, 30) + '...',
+          grounding: processedChunk.grounding,
+          pixelCoordinates: processedChunk.pixelCoordinates,
+          isVisible: processedChunk.isVisible,
+          page: processedChunk.page,
+          currentPage
+        });
         onChunkHighlight?.(chunkId, processedChunk.grounding);
       }
     } else {
@@ -137,14 +139,17 @@ export default function TextChunkHighlighter({
 
   // Handle chunk click
   const handleChunkClick = (chunk: TextChunk) => {
-    console.log('🖱️ TextChunkHighlighter: Clicking chunk', {
-      chunkId: chunk.chunk_id,
-      text: chunk.text.substring(0, 50) + '...',
-      chunkType: chunk.chunk_type,
-      grounding: chunk.grounding,
-      hasGrounding: chunk.grounding && chunk.grounding.length > 0,
-      groundingCount: chunk.grounding?.length || 0
-    });
+    if (chunk.grounding && chunk.grounding.length > 0) {
+      console.log('🖱️ TextChunkHighlighter: Clicking chunk', {
+        chunkId: chunk.chunk_id,
+        text: chunk.text.substring(0, 50) + '...',
+        chunkType: chunk.chunk_type,
+        grounding: chunk.grounding[0],
+        groundingBox: chunk.grounding[0].box,
+        targetPage: chunk.grounding[0].page,
+        currentPage
+      });
+    }
     
     onChunkClick?.(chunk);
     

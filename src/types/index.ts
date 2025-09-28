@@ -171,12 +171,22 @@ export function transformLegacyToGrounding(
   pageWidth: number,
   pageHeight: number
 ): TextChunk {
+  // Convert percentage coordinates (0-100) to normalized coordinates (0-1)
+  // Then create Landing AI-style grounding box (l, t, r, b format)
   const normalizedBox: GroundingBox = {
-    l: legacyChunk.geometry.x / pageWidth,
-    t: legacyChunk.geometry.y / pageHeight,
-    r: (legacyChunk.geometry.x + legacyChunk.geometry.w) / pageWidth,
-    b: (legacyChunk.geometry.y + legacyChunk.geometry.h) / pageHeight,
+    l: Math.max(0, Math.min(legacyChunk.geometry.x / 100, 1)), // Convert percentage to normalized
+    t: Math.max(0, Math.min(legacyChunk.geometry.y / 100, 1)), // Convert percentage to normalized
+    r: Math.max(0, Math.min((legacyChunk.geometry.x + legacyChunk.geometry.w) / 100, 1)), // Convert percentage to normalized
+    b: Math.max(0, Math.min((legacyChunk.geometry.y + legacyChunk.geometry.h) / 100, 1)), // Convert percentage to normalized
   };
+
+  // Ensure r > l and b > t
+  if (normalizedBox.r <= normalizedBox.l) {
+    normalizedBox.r = Math.min(normalizedBox.l + 0.01, 1);
+  }
+  if (normalizedBox.b <= normalizedBox.t) {
+    normalizedBox.b = Math.min(normalizedBox.t + 0.01, 1);
+  }
 
   return {
     chunk_id: legacyChunk.id,
@@ -203,10 +213,10 @@ export function transformGroundingToLegacy(
     text: textChunk.text,
     pageNumber: grounding.page + 1, // Convert to 1-based
     geometry: {
-      x: box.l * pageWidth,
-      y: box.t * pageHeight,
-      w: (box.r - box.l) * pageWidth,
-      h: (box.b - box.t) * pageHeight,
+      x: Math.max(0, Math.min(box.l * 100, 100)), // Convert normalized to percentage
+      y: Math.max(0, Math.min(box.t * 100, 100)), // Convert normalized to percentage
+      w: Math.max(0.1, Math.min((box.r - box.l) * 100, 100)), // Convert normalized to percentage
+      h: Math.max(0.1, Math.min((box.b - box.t) * 100, 100)), // Convert normalized to percentage
     },
   };
 }
@@ -216,16 +226,10 @@ export function transformGroundingToPixels(
   documentWidth: number,
   documentHeight: number
 ): { x: number; y: number; width: number; height: number } {
-  // Ensure coordinates are properly bounded
-  const l = Math.max(0, Math.min(grounding.l, 1));
-  const t = Math.max(0, Math.min(grounding.t, 1));
-  const r = Math.max(l, Math.min(grounding.r, 1));
-  const b = Math.max(t, Math.min(grounding.b, 1));
-  
   return {
-    x: Math.round(l * documentWidth),
-    y: Math.round(t * documentHeight),
-    width: Math.round((r - l) * documentWidth),
-    height: Math.round((b - t) * documentHeight),
+    x: Math.round(grounding.l * documentWidth),
+    y: Math.round(grounding.t * documentHeight),
+    width: Math.round((grounding.r - grounding.l) * documentWidth),
+    height: Math.round((grounding.b - grounding.t) * documentHeight),
   };
 }

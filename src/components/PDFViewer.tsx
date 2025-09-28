@@ -153,17 +153,32 @@ const PDFViewer = () => {
 
   // Advanced feature handlers
   const handleTextChunkHighlight = useCallback((chunkId: string | null, grounding?: Grounding) => {
+    console.log('🎯 PDFViewer: Text chunk highlight triggered', {
+      chunkId,
+      grounding,
+      currentPage,
+      hasGrounding: !!grounding
+    });
     setSelectedChunk(chunkId || '');
     setHighlightedGrounding(grounding || null);
   }, []);
 
   const handleTextChunkClick = useCallback((chunk: TextChunk) => {
+    console.log('🖱️ PDFViewer: Text chunk click triggered', {
+      chunkId: chunk.chunk_id,
+      text: chunk.text.substring(0, 30) + '...',
+      grounding: chunk.grounding?.[0],
+      currentPage
+    });
     setSelectedChunk(chunk.chunk_id);
     if (chunk.grounding && chunk.grounding.length > 0) {
       const targetPage = chunk.grounding[0].page + 1; // Convert to 1-based
       if (targetPage !== currentPage) {
+        console.log(`📄 Switching to page ${targetPage} from ${currentPage}`);
         setCurrentPage(targetPage);
       }
+      // Set the grounding for highlighting
+      setHighlightedGrounding(chunk.grounding[0]);
     }
   }, [currentPage]);
 
