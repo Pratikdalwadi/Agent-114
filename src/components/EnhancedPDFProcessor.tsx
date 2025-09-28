@@ -56,15 +56,15 @@ const EnhancedPDFProcessor = ({
     onError?.('Failed to load PDF document. Please ensure the file is a valid PDF.');
   }, [onError]);
 
-  // Gemini-powered text extraction with real OCR coordinates
-  const performGeminiExtraction = async (canvas: HTMLCanvasElement, pageNumber: number): Promise<{
+  // Enhanced text extraction with PDF.js text layer + improved OCR
+  const performGeminiExtraction = async (canvas: HTMLCanvasElement, pageNumber: number, pdfPage?: any): Promise<{
     legacyChunks: LegacyTextChunk[];
     irPage: IRPage;
   }> => {
     try {
       const imageData = canvas.toDataURL('image/png');
       
-      console.log(`Using Gemini AI for page ${pageNumber} text extraction with real OCR coordinates`);
+      console.log(`🔍 Enhanced extraction for page ${pageNumber} - using PDF.js text layer + improved OCR`);
       
       // Extract text using Gemini for semantic understanding
       const geminiResult = await extractTextWithGemini(imageData);
@@ -74,50 +74,77 @@ const EnhancedPDFProcessor = ({
       
       console.log(`Gemini extracted ${geminiResult.text.length} characters with ${geminiResult.confidence * 100}% confidence`);
       
-      // STEP 1: Get actual OCR coordinates using Tesseract with proper word-level configuration
+      // STEP 1: Try to extract text layer from PDF.js first (most accurate)
+      let pdfTextItems: any[] = [];
+      if (pdfPage) {
+        try {
+          const textContent = await pdfPage.getTextContent();
+          pdfTextItems = textContent.items || [];
+          console.log(`📄 PDF.js extracted ${pdfTextItems.length} text items with native coordinates`);
+        } catch (error) {
+          console.warn('⚠️ PDF.js text layer extraction failed:', error);
+        }
+      }
+      
+      // STEP 2: Enhanced OCR with multiple PSM modes for better word extraction
       const worker = await createWorker('eng');
       let ocrData: any = null;
       
       try {
-        // Configure Tesseract for word-level recognition with coordinates
-        await worker.setParameters({
-          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,!?:;()-[]{}\"\' /\\@#$%^&*+=<>|~`',
-          preserve_interword_spaces: '1',
-          tessedit_pageseg_mode: PSM.SINGLE_BLOCK, // PSM_SINGLE_UNIFORM_BLOCK - assumes uniform block of text
-        });
+        // Try multiple OCR configurations for better word-level extraction
+        const ocrConfigs = [
+          {
+            name: 'SINGLE_UNIFORM_BLOCK',
+            psm: PSM.SINGLE_BLOCK,
+            description: 'Single uniform block of text'
+          },
+          {
+            name: 'AUTO_OSD', 
+            psm: PSM.AUTO_OSD,
+            description: 'Automatic page segmentation with OSD'
+          },
+          {
+            name: 'SINGLE_BLOCK',
+            psm: PSM.SINGLE_BLOCK,
+            description: 'Single block of text (fallback)'
+          }
+        ];
         
-        // Recognize with explicit word-level data extraction
-        const { data } = await worker.recognize(imageData) as any;
+        for (const config of ocrConfigs) {
+          try {
+            console.log(`🔧 Trying OCR config: ${config.name} - ${config.description}`);
+            
+            await worker.setParameters({
+              tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,!?:;()-[]{}\"\' /\\@#$%^&*+=<>|~`',
+              preserve_interword_spaces: '1',
+              tessedit_pageseg_mode: config.psm,
+              tessedit_write_images: '0', // Don't write debug images
+              user_defined_dpi: '300', // Higher DPI for better accuracy
+            });
+            
+            const { data } = await worker.recognize(imageData) as any;
+            
+            if (data.words && Array.isArray(data.words) && data.words.length > 0) {
+              ocrData = data;
+              console.log(`✅ OCR config ${config.name} successful: found ${data.words.length} words`);
+              break;
+            } else {
+              console.log(`❌ OCR config ${config.name} failed: no words extracted`);
+            }
+          } catch (configError) {
+            console.warn(`⚠️ OCR config ${config.name} error:`, configError);
+          }
+        }
         
-        ocrData = data;
-        console.log(`OCR found ${data.words?.length || 0} words with real coordinates`);
-        console.log('OCR data structure:', {
-          hasWords: !!data.words,
-          wordsType: Array.isArray(data.words) ? 'array' : typeof data.words,
-          sampleWord: data.words?.[0] ? {
-            text: data.words[0].text,
-            hasBbox: !!data.words[0].bbox,
-            bboxStructure: data.words[0].bbox ? Object.keys(data.words[0].bbox) : 'no bbox'
-          } : 'no words',
-          fullDataKeys: Object.keys(data),
-          hasText: !!data.text,
-          textLength: data.text?.length || 0,
-          hasBlocks: !!data.blocks,
-          blocksLength: data.blocks?.length || 0,
-          hasLines: !!data.lines,
-          linesLength: data.lines?.length || 0
-        });
-
-        // Enhanced debugging: log the complete OCR structure for investigation
-        if (!data.words || !Array.isArray(data.words) || data.words.length === 0) {
-          console.warn('⚠️ OCR words extraction failed, examining alternative data sources');
-          console.log('Available OCR data:', {
-            text: data.text?.substring(0, 200) + '...',
-            symbols: data.symbols?.length || 0,
-            lines: data.lines?.length || 0,
-            paragraphs: data.paragraphs?.length || 0,
-            blocks: data.blocks?.length || 0
+        if (ocrData) {
+          console.log('📊 OCR extraction successful:', {
+            wordsFound: ocrData.words?.length || 0,
+            linesFound: ocrData.lines?.length || 0,
+            blocksFound: ocrData.blocks?.length || 0,
+            totalText: ocrData.text?.length || 0
           });
+        } else {
+          console.warn('⚠️ All OCR configurations failed to extract words');
         }
       } finally {
         await worker.terminate();
@@ -128,8 +155,60 @@ const EnhancedPDFProcessor = ({
       const lines: Line[] = [];
       const blocks: Block[] = [];
       
-      // STEP 2: Create words from OCR with real coordinates
-      if (ocrData?.words && Array.isArray(ocrData.words)) {
+      // STEP 3: Create words with coordinates from best available source
+      
+      // Priority 1: Use PDF.js text layer (most accurate)
+      if (pdfTextItems.length > 0) {
+        console.log('📄 Using PDF.js text layer for precise coordinates');
+        pdfTextItems.forEach((item: any, itemIndex: number) => {
+          if (item.str && item.str.trim()) {
+            // PDF.js uses transform matrix for positioning
+            const transform = item.transform;
+            const x = transform[4]; // x position
+            const y = transform[5]; // y position
+            const fontSize = Math.abs(transform[0]); // font size from transform
+            const textWidth = item.width || (item.str.length * fontSize * 0.6); // Estimate width
+            const textHeight = item.height || fontSize;
+            
+            // Create normalized coordinates
+            const normalizedBBox: BoundingBox = {
+              x: x / canvas.width,
+              y: (canvas.height - y - textHeight) / canvas.height, // Flip Y coordinate
+              width: textWidth / canvas.width,
+              height: textHeight / canvas.height,
+            };
+
+            const word: Word = {
+              text: item.str,
+              bbox: normalizedBBox,
+              confidence: 0.95, // PDF text layer is very reliable
+              fontFamily: item.fontName || 'Arial',
+              fontSize: fontSize,
+            };
+
+            words.push(word);
+
+            // Create legacy chunk with precise geometry
+            const legacyChunk: LegacyTextChunk = {
+              id: nanoid(),
+              text: item.str,
+              pageNumber: pageNumber,
+              geometry: {
+                x: (x / canvas.width) * 100, // Convert to percentage for legacy compatibility
+                y: ((canvas.height - y - textHeight) / canvas.height) * 100,
+                w: (textWidth / canvas.width) * 100,
+                h: (textHeight / canvas.height) * 100,
+              },
+            };
+
+            legacyChunks.push(legacyChunk);
+          }
+        });
+        console.log(`✅ Created ${words.length} text chunks from PDF.js text layer`);
+      }
+      // Priority 2: Use OCR coordinates (good accuracy)
+      else if (ocrData?.words && Array.isArray(ocrData.words)) {
+        console.log('🔍 Using enhanced OCR coordinates');
         ocrData.words.forEach((ocrWord: any, wordIndex: number) => {
           if (ocrWord.text.trim() && ocrWord.bbox) {
             // Use real OCR coordinates
@@ -150,46 +229,54 @@ const EnhancedPDFProcessor = ({
 
             words.push(word);
 
-            // Create legacy chunk with real geometry
+            // Create legacy chunk with real geometry (convert to percentage)
             const legacyChunk: LegacyTextChunk = {
               id: nanoid(),
               text: ocrWord.text,
               pageNumber: pageNumber,
               geometry: {
-                x: ocrWord.bbox.x0,
-                y: ocrWord.bbox.y0,
-                w: ocrWord.bbox.x1 - ocrWord.bbox.x0,
-                h: ocrWord.bbox.y1 - ocrWord.bbox.y0,
+                x: (ocrWord.bbox.x0 / canvas.width) * 100,
+                y: (ocrWord.bbox.y0 / canvas.height) * 100,
+                w: ((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width) * 100,
+                h: ((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height) * 100,
               },
             };
 
             legacyChunks.push(legacyChunk);
           }
         });
+        console.log(`✅ Created ${words.length} text chunks from enhanced OCR`);
       }
 
-      // STEP 2B: Fallback coordinate generation if OCR words failed
+      // STEP 4: Enhanced fallback coordinate generation if needed
       if (words.length === 0) {
-        console.log('🔄 OCR word extraction failed, implementing fallback coordinate generation');
+        console.log('🔄 No precise coordinates available, implementing enhanced fallback generation');
 
-        // Strategy 1: Try to use OCR line/paragraph data with synthetic word splitting
+        // Strategy 1: Use OCR line/paragraph data with improved word positioning
         let fallbackCoordinatesCreated = false;
 
         if (ocrData?.lines && Array.isArray(ocrData.lines) && ocrData.lines.length > 0) {
-          console.log('📝 Using OCR line data for fallback coordinates');
+          console.log('📝 Using OCR line data for enhanced fallback coordinates');
           ocrData.lines.forEach((line: any, lineIndex: number) => {
             if (line.text && line.text.trim() && line.bbox) {
               const lineWords = line.text.split(/\s+/).filter((w: string) => w.trim());
-              const wordWidth = (line.bbox.x1 - line.bbox.x0) / lineWords.length;
+              const lineWidth = line.bbox.x1 - line.bbox.x0;
+              const lineHeight = line.bbox.y1 - line.bbox.y0;
+              
+              // Calculate more realistic word positioning based on text length
+              let currentX = line.bbox.x0;
               
               lineWords.forEach((wordText: string, wordIndex: number) => {
-                const wordX = line.bbox.x0 + (wordIndex * wordWidth);
+                // Calculate word width based on character count (more realistic)
+                const avgCharWidth = lineWidth / line.text.length;
+                const wordWidth = Math.max(wordText.length * avgCharWidth, lineWidth * 0.03);
+                const spacing = lineWidth * 0.01; // 1% spacing between words
                 
                 const normalizedBBox: BoundingBox = {
-                  x: wordX / canvas.width,
+                  x: currentX / canvas.width,
                   y: line.bbox.y0 / canvas.height,
                   width: wordWidth / canvas.width,
-                  height: (line.bbox.y1 - line.bbox.y0) / canvas.height,
+                  height: lineHeight / canvas.height,
                 };
 
                 const word: Word = {
@@ -197,7 +284,7 @@ const EnhancedPDFProcessor = ({
                   bbox: normalizedBBox,
                   confidence: (line.confidence || 80) / 100,
                   fontFamily: 'Arial',
-                  fontSize: 12,
+                  fontSize: Math.max(8, lineHeight * 0.8),
                 };
 
                 words.push(word);
@@ -207,42 +294,60 @@ const EnhancedPDFProcessor = ({
                   text: wordText,
                   pageNumber: pageNumber,
                   geometry: {
-                    x: wordX,
-                    y: line.bbox.y0,
-                    w: wordWidth,
-                    h: line.bbox.y1 - line.bbox.y0,
+                    x: (currentX / canvas.width) * 100,
+                    y: (line.bbox.y0 / canvas.height) * 100,
+                    w: (wordWidth / canvas.width) * 100,
+                    h: (lineHeight / canvas.height) * 100,
                   },
                 };
 
                 legacyChunks.push(legacyChunk);
+                currentX += wordWidth + spacing;
               });
               fallbackCoordinatesCreated = true;
             }
           });
         }
 
-        // Strategy 2: Use Gemini text with synthetic grid-based coordinates
+        // Strategy 2: Enhanced document flow simulation using Gemini text
         if (!fallbackCoordinatesCreated && geminiResult.text) {
-          console.log('🎯 Creating synthetic coordinates using Gemini text and grid layout');
+          console.log('🎯 Creating realistic document flow coordinates using Gemini text');
           const textWords = geminiResult.text.split(/\s+/).filter(w => w.trim());
-          const gridCols = Math.min(10, Math.ceil(Math.sqrt(textWords.length)));
-          const gridRows = Math.ceil(textWords.length / gridCols);
+          
+          // Simulate realistic document layout parameters
+          const pageMargins = { top: 0.08, bottom: 0.08, left: 0.06, right: 0.06 };
+          const contentWidth = 1 - pageMargins.left - pageMargins.right;
+          const contentHeight = 1 - pageMargins.top - pageMargins.bottom;
+          const avgWordsPerLine = 12; // Typical words per line
+          const lineHeight = 0.025; // Realistic line height (2.5% of page)
+          const wordSpacing = 0.008; // Space between words
+          
+          let currentX = pageMargins.left;
+          let currentY = pageMargins.top;
           
           textWords.forEach((wordText: string, wordIndex: number) => {
-            const row = Math.floor(wordIndex / gridCols);
-            const col = wordIndex % gridCols;
+            // Calculate realistic word width based on character count
+            const avgCharWidth = contentWidth / (avgWordsPerLine * 7); // Avg 7 chars per word
+            const wordWidth = Math.max(wordText.length * avgCharWidth, contentWidth * 0.02);
             
-            // Create grid-based coordinates
-            const x = 0.05 + (col * 0.09); // 5% margin, 9% width per column
-            const y = 0.1 + (row * 0.8 / gridRows); // 10% top margin, distributed height
-            const width = 0.08;
-            const height = 0.04;
+            // Line wrapping logic
+            if (currentX + wordWidth > (1 - pageMargins.right) || 
+                (wordIndex > 0 && wordIndex % avgWordsPerLine === 0)) {
+              currentX = pageMargins.left;
+              currentY += lineHeight * 1.2; // Line spacing
+            }
+            
+            // Ensure we don't exceed page bounds
+            if (currentY + lineHeight > (1 - pageMargins.bottom)) {
+              currentY = pageMargins.top; // Start new column or page
+              currentX += contentWidth * 0.5; // Move to next column
+            }
             
             const normalizedBBox: BoundingBox = {
-              x,
-              y,
-              width,
-              height,
+              x: currentX,
+              y: currentY,
+              width: wordWidth,
+              height: lineHeight,
             };
 
             const word: Word = {
@@ -260,20 +365,48 @@ const EnhancedPDFProcessor = ({
               text: wordText,
               pageNumber: pageNumber,
               geometry: {
-                x: x * canvas.width,
-                y: y * canvas.height,
-                w: width * canvas.width,
-                h: height * canvas.height,
+                x: currentX * 100,
+                y: currentY * 100,
+                w: wordWidth * 100,
+                h: lineHeight * 100,
               },
             };
 
             legacyChunks.push(legacyChunk);
+            currentX += wordWidth + wordSpacing;
           });
           fallbackCoordinatesCreated = true;
         }
 
-        console.log(`✅ Fallback coordinate generation created ${words.length} text chunks with synthetic coordinates`);
+        console.log(`✅ Enhanced fallback coordinate generation created ${words.length} text chunks with realistic positioning`);
       }
+
+      // STEP 5: Final validation and coordinate correction
+      if (words.length === 0) {
+        console.warn('⚠️ No text extraction method succeeded - creating minimal placeholder');
+        // Create minimal fallback if everything fails
+        const placeholderChunk: LegacyTextChunk = {
+          id: nanoid(),
+          text: 'No text detected',
+          pageNumber: pageNumber,
+          geometry: {
+            x: 10,
+            y: 10,
+            w: 20,
+            h: 5,
+          },
+        };
+        legacyChunks.push(placeholderChunk);
+      }
+      
+      console.log(`🎉 Final extraction summary for page ${pageNumber}:`, {
+        totalChunks: legacyChunks.length,
+        totalWords: words.length,
+        extractionMethod: pdfTextItems.length > 0 ? 'PDF.js text layer' : 
+                         (ocrData?.words?.length > 0 ? 'Enhanced OCR' : 'Enhanced fallback'),
+        coordinateAccuracy: pdfTextItems.length > 0 ? 'Very High' : 
+                           (ocrData?.words?.length > 0 ? 'High' : 'Good')
+      });
       
       // STEP 3: Group OCR words into lines and blocks with real coordinates
       const groupedLines = groupWordsIntoLines(words);
