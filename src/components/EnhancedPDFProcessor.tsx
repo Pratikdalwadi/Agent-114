@@ -188,14 +188,14 @@ const EnhancedPDFProcessor = ({
 
             words.push(word);
 
-            // Create legacy chunk with precise geometry
+            // Create legacy chunk with precise geometry (PDF.js coordinates are already correct)
             const legacyChunk: LegacyTextChunk = {
               id: nanoid(),
               text: item.str,
               pageNumber: pageNumber,
               geometry: {
                 x: (x / canvas.width) * 100, // Convert to percentage for legacy compatibility
-                y: ((canvas.height - y - textHeight) / canvas.height) * 100,
+                y: (y / canvas.height) * 100, // Don't flip Y - PDF.js coordinates are already correct
                 w: (textWidth / canvas.width) * 100,
                 h: (textHeight / canvas.height) * 100,
               },
@@ -211,12 +211,12 @@ const EnhancedPDFProcessor = ({
         console.log('🔍 Using enhanced OCR coordinates');
         ocrData.words.forEach((ocrWord: any, wordIndex: number) => {
           if (ocrWord.text.trim() && ocrWord.bbox) {
-            // Use real OCR coordinates
+            // Use OCR coordinates with proper normalization and validation
             const normalizedBBox: BoundingBox = {
-              x: ocrWord.bbox.x0 / canvas.width,
-              y: ocrWord.bbox.y0 / canvas.height,
-              width: (ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width,
-              height: (ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height,
+              x: Math.max(0, Math.min(ocrWord.bbox.x0 / canvas.width, 1)),
+              y: Math.max(0, Math.min(ocrWord.bbox.y0 / canvas.height, 1)),
+              width: Math.max(0.001, Math.min((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width, 1)),
+              height: Math.max(0.001, Math.min((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height, 1)),
             };
 
             const word: Word = {
@@ -229,16 +229,16 @@ const EnhancedPDFProcessor = ({
 
             words.push(word);
 
-            // Create legacy chunk with real geometry (convert to percentage)
+            // Create legacy chunk with validated geometry (convert to percentage with bounds checking)
             const legacyChunk: LegacyTextChunk = {
               id: nanoid(),
               text: ocrWord.text,
               pageNumber: pageNumber,
               geometry: {
-                x: (ocrWord.bbox.x0 / canvas.width) * 100,
-                y: (ocrWord.bbox.y0 / canvas.height) * 100,
-                w: ((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width) * 100,
-                h: ((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height) * 100,
+                x: Math.max(0, Math.min((ocrWord.bbox.x0 / canvas.width) * 100, 100)),
+                y: Math.max(0, Math.min((ocrWord.bbox.y0 / canvas.height) * 100, 100)),
+                w: Math.max(0.1, Math.min(((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width) * 100, 100)),
+                h: Math.max(0.1, Math.min(((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height) * 100, 100)),
               },
             };
 
@@ -294,10 +294,10 @@ const EnhancedPDFProcessor = ({
                   text: wordText,
                   pageNumber: pageNumber,
                   geometry: {
-                    x: (currentX / canvas.width) * 100,
-                    y: (line.bbox.y0 / canvas.height) * 100,
-                    w: (wordWidth / canvas.width) * 100,
-                    h: (lineHeight / canvas.height) * 100,
+                    x: Math.max(0, Math.min((currentX / canvas.width) * 100, 100)),
+                    y: Math.max(0, Math.min((line.bbox.y0 / canvas.height) * 100, 100)),
+                    w: Math.max(0.5, Math.min((wordWidth / canvas.width) * 100, 100)),
+                    h: Math.max(1.0, Math.min((lineHeight / canvas.height) * 100, 100)),
                   },
                 };
 
@@ -365,10 +365,10 @@ const EnhancedPDFProcessor = ({
               text: wordText,
               pageNumber: pageNumber,
               geometry: {
-                x: currentX * 100,
-                y: currentY * 100,
-                w: wordWidth * 100,
-                h: lineHeight * 100,
+                x: Math.max(0, Math.min(currentX * 100, 100)),
+                y: Math.max(0, Math.min(currentY * 100, 100)),
+                w: Math.max(0.5, Math.min(wordWidth * 100, 100)),
+                h: Math.max(1.0, Math.min(lineHeight * 100, 100)),
               },
             };
 
@@ -546,10 +546,10 @@ const EnhancedPDFProcessor = ({
               text: word.text,
               pageNumber: pageNumber,
               geometry: {
-                x: word.bbox.x * canvas.width,
-                y: word.bbox.y * canvas.height,
-                w: word.bbox.width * canvas.width,
-                h: word.bbox.height * canvas.height,
+                x: Math.max(0, Math.min(word.bbox.x * 100, 100)),
+                y: Math.max(0, Math.min(word.bbox.y * 100, 100)),
+                w: Math.max(0.5, Math.min(word.bbox.width * 100, 100)),
+                h: Math.max(1.0, Math.min(word.bbox.height * 100, 100)),
               },
             };
             legacyChunks.push(legacyChunk);
@@ -1108,10 +1108,10 @@ const EnhancedPDFProcessor = ({
                   text: word.text.trim(),
                   pageNumber: page.pageNumber,
                   geometry: {
-                    x: word.bbox.x * page.width,
-                    y: word.bbox.y * page.height,
-                    w: word.bbox.width * page.width,
-                    h: word.bbox.height * page.height,
+                    x: word.bbox.x * 100, // Convert normalized (0-1) to percentage (0-100)
+                    y: word.bbox.y * 100, // Convert normalized (0-1) to percentage (0-100) 
+                    w: word.bbox.width * 100, // Convert normalized (0-1) to percentage (0-100)
+                    h: word.bbox.height * 100, // Convert normalized (0-1) to percentage (0-100)
                   },
                 };
 
