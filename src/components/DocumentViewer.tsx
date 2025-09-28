@@ -121,37 +121,29 @@ const DocumentViewer = ({
       return { display: 'none' };
     }
 
-    // Enhanced coordinate handling for both percentage (0-100) and normalized (0-1) systems
-    // Detect coordinate system based on values
-    const isPercentageSystem = chunk.geometry.x > 1 || chunk.geometry.y > 1 || 
-                              chunk.geometry.w > 1 || chunk.geometry.h > 1;
-    
-    let x, y, width, height;
-    
-    if (isPercentageSystem) {
-      // Legacy percentage system (0-100)
-      x = Math.max(0, Math.min((chunk.geometry.x / 100) * imageDimensions.width, imageDimensions.width));
-      y = Math.max(0, Math.min((chunk.geometry.y / 100) * imageDimensions.height, imageDimensions.height));
-      width = Math.max(1, Math.min((chunk.geometry.w / 100) * imageDimensions.width, imageDimensions.width - x));
-      height = Math.max(1, Math.min((chunk.geometry.h / 100) * imageDimensions.height, imageDimensions.height - y));
-    } else {
-      // Normalized coordinate system (0-1)
-      x = Math.max(0, Math.min(chunk.geometry.x * imageDimensions.width, imageDimensions.width));
-      y = Math.max(0, Math.min(chunk.geometry.y * imageDimensions.height, imageDimensions.height));
-      width = Math.max(1, Math.min(chunk.geometry.w * imageDimensions.width, imageDimensions.width - x));
-      height = Math.max(1, Math.min(chunk.geometry.h * imageDimensions.height, imageDimensions.height - y));
-    }
+    // Enhanced coordinate handling with proper percentage-based calculation
+    // All legacy chunks use percentage system (0-100)
+    const x = Math.max(0, Math.min((chunk.geometry.x / 100) * imageDimensions.width, imageDimensions.width));
+    const y = Math.max(0, Math.min((chunk.geometry.y / 100) * imageDimensions.height, imageDimensions.height));
+    const width = Math.max(1, Math.min((chunk.geometry.w / 100) * imageDimensions.width, imageDimensions.width - x));
+    const height = Math.max(1, Math.min((chunk.geometry.h / 100) * imageDimensions.height, imageDimensions.height - y));
 
     const isHighlighted = highlightedChunk === chunk.id;
     
-    console.log(`🎯 DocumentViewer: Rendering bounding box for ${chunk.text.substring(0, 20)}...`, {
-      chunkId: chunk.id,
-      originalGeometry: chunk.geometry,
-      coordinateSystem: isPercentageSystem ? 'percentage (0-100)' : 'normalized (0-1)',
-      imageDimensions,
-      calculatedPosition: { x, y, width, height },
-      isHighlighted
-    });
+    if (isHighlighted) {
+      console.log(`🎯 DocumentViewer: Rendering highlighted bounding box for "${chunk.text.substring(0, 30)}..."`, {
+        chunkId: chunk.id,
+        originalGeometry: chunk.geometry,
+        imageDimensions,
+        calculatedPosition: { x, y, width, height },
+        percentageCalculation: {
+          xPercent: chunk.geometry.x,
+          yPercent: chunk.geometry.y,
+          wPercent: chunk.geometry.w,
+          hPercent: chunk.geometry.h
+        }
+      });
+    }
 
     return {
       position: 'absolute' as const,
@@ -180,44 +172,36 @@ const DocumentViewer = ({
   // Enhanced function to handle new TextChunk format with grounding
   const getGroundingBoxStyle = () => {
     if (!highlightedGrounding || !imageLoaded || !imageDimensions.width || !imageDimensions.height) {
-      console.log('📦 DocumentViewer: Cannot show grounding box', {
-        hasHighlightedGrounding: !!highlightedGrounding,
-        imageLoaded,
-        imageDimensions,
-        hasDocumentDimensions: !!documentDimensions
-      });
       return { display: 'none' };
     }
 
-    // Enhanced coordinate transformation with bounds checking
-    const pixelCoords = transformGroundingToPixels(
-      highlightedGrounding.box,
-      imageDimensions.width,
-      imageDimensions.height
-    );
+    // Transform Landing AI grounding coordinates (l, t, r, b) to pixel coordinates
+    // Landing AI uses normalized coordinates (0-1) with l,t,r,b format
+    const box = highlightedGrounding.box;
+    const x = Math.max(0, Math.min(box.l * imageDimensions.width, imageDimensions.width));
+    const y = Math.max(0, Math.min(box.t * imageDimensions.height, imageDimensions.height));
+    const width = Math.max(1, Math.min((box.r - box.l) * imageDimensions.width, imageDimensions.width - x));
+    const height = Math.max(1, Math.min((box.b - box.t) * imageDimensions.height, imageDimensions.height - y));
     
-    // Apply bounds checking and ensure valid coordinates
-    const boundedCoords = {
-      x: Math.max(0, Math.min(pixelCoords.x, imageDimensions.width)),
-      y: Math.max(0, Math.min(pixelCoords.y, imageDimensions.height)),
-      width: Math.max(1, Math.min(pixelCoords.width, imageDimensions.width - pixelCoords.x)),
-      height: Math.max(1, Math.min(pixelCoords.height, imageDimensions.height - pixelCoords.y))
-    };
-    
-    console.log('💚 DocumentViewer: Creating enhanced grounding bounding box', {
+    console.log('💚 DocumentViewer: Rendering grounding bounding box', {
       highlightedGrounding,
       imageDimensions,
-      rawPixelCoords: pixelCoords,
-      boundedCoords,
-      groundingBox: highlightedGrounding.box
+      groundingBox: box,
+      calculatedPosition: { x, y, width, height },
+      normalizedCoords: {
+        l: box.l,
+        t: box.t,
+        r: box.r,
+        b: box.b
+      }
     });
 
     return {
       position: 'absolute' as const,
-      left: `${Math.round(boundedCoords.x)}px`,
-      top: `${Math.round(boundedCoords.y)}px`,
-      width: `${Math.round(boundedCoords.width)}px`,
-      height: `${Math.round(boundedCoords.height)}px`,
+      left: `${Math.round(x)}px`,
+      top: `${Math.round(y)}px`,
+      width: `${Math.round(width)}px`,
+      height: `${Math.round(height)}px`,
       border: '3px solid #22c55e', // Green color for highlighting
       backgroundColor: 'rgba(34, 197, 94, 0.2)', // Green background
       cursor: 'pointer',
