@@ -1,0 +1,14 @@
+paddlepaddle
+paddleocr
+opencv-python
+pillow
+numpy
+layoutparser[paddledetection]
+torch
+torchvision
+easyocr
+pdfplumber
+fastapi
+uvicorn
+python-multipart
+requests

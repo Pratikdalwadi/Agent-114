@@ -1,0 +1,129 @@
+Building an Agentic Document AI with Text Chunk Highlighting
+The Landing AI text chunk highlighting mechanism works through a sophisticated coordinate-based system that maps extracted text to precise locations in the original document. Here's how they achieve this functionality:
+
+The Core Architecture
+Landing AI's Agentic Document Extraction uses a grounding system that ties each extracted text chunk to its exact position in the source document. This enables the interactive highlighting feature you see when clicking on extracted text.
+
+Key Components
+Grounding Mechanism
+Each extracted text chunk contains grounding information with:
+
+Page index: Which page the text appears on (0-based indexing)
+
+Bounding box coordinates: Precise rectangular coordinates using relative positioning
+
+Chunk metadata: Type of content (title, table, figure, text, etc.)
+
+Coordinate System
+The bounding box uses relative coordinates with four values:
+
+l (left): X-coordinate of left edge
+
+t (top): Y-coordinate of top edge
+
+r (right): X-coordinate of right edge
+
+b (bottom): Y-coordinate of bottom edge
+
+All coordinates are normalized between 0 and 1, making them resolution-independent.
+
+JSON Schema Structure
+The API returns structured data with this format:
+
+json
+{
+  "markdown": "user-friendly text representation",
+  "chunks": [
+    {
+      "text": "extracted text content",
+      "chunk_id": "unique identifier",
+      "chunk_type": "text|table|figure|title|etc",
+      "grounding": [
+        {
+          "page": 0,
+          "box": {
+            "l": 0.1,
+            "t": 0.2, 
+            "r": 0.8,
+            "b": 0.4
+          }
+        }
+      ]
+    }
+  ]
+}
+Implementation Process
+1. Document Processing
+The system processes PDFs using computer vision and layout analysis to:
+
+Identify text regions, tables, figures, and other elements
+
+Extract text content while preserving spatial relationships
+
+Generate bounding box coordinates for each element
+
+Maintain page-level organization
+
+2. Coordinate Transformation
+When displaying highlights, the relative coordinates must be converted to pixel coordinates:
+
+python
+# Convert relative coordinates to pixel coordinates
+def transform_coordinates(bbox, img_width, img_height):
+    x1 = int(bbox['l'] * img_width)
+    y1 = int(bbox['t'] * img_height)  
+    x2 = int(bbox['r'] * img_width)
+    y2 = int(bbox['b'] * img_height)
+    return (x1, y1, x2, y2)
+3. Interactive Highlighting
+The frontend implementation involves:
+
+Converting PDF pages to images for display
+
+Overlaying clickable regions based on bounding box coordinates
+
+Highlighting selected chunks by drawing rectangles over the corresponding areas
+
+Synchronizing between text chunks and visual highlights
+
+Technical Advantages
+Resolution Independence
+Using relative coordinates (0-1 range) ensures highlights work correctly regardless of PDF rendering DPI or zoom level.
+
+Multi-Element Support
+Each chunk can have multiple grounding entries, supporting text that spans multiple areas or pages.
+
+Precise Mapping
+The system maintains exact spatial relationships between extracted content and source locations, enabling accurate visual feedback.
+
+Building Your Own Implementation
+To replicate this functionality, you would need:
+
+Backend Components
+OCR/Layout Analysis Engine: Extract text and determine bounding boxes
+
+Coordinate System: Implement relative positioning (0-1 normalized)
+
+Chunk Processing: Group related text elements while maintaining spatial metadata
+
+API Layer: Return structured data with text + grounding information
+
+Frontend Components
+PDF Renderer: Display PDF pages as images or canvas elements
+
+Coordinate Transformation: Convert relative to pixel coordinates
+
+Overlay System: Draw highlights and handle click interactions
+
+Synchronization: Link text chunks to visual highlights
+
+Key Libraries and Tools
+PDF Processing: PDF.js, PyMuPDF, or similar for rendering
+
+OCR: Tesseract, AWS Textract, or Google Vision API for text extraction
+
+Computer Vision: OpenCV for image processing and coordinate manipulation
+
+Frontend: Canvas API or SVG overlays for drawing highlights
+
+The sophisticated part of Landing AI's implementation is the layout-aware analysis that accurately identifies document structure while maintaining precise spatial relationships. This goes beyond simple OCR by understanding visual document elements and their contextual relationship
