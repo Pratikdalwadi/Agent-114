@@ -1108,10 +1108,10 @@ const EnhancedPDFProcessor = ({
                   text: word.text.trim(),
                   pageNumber: page.pageNumber,
                   geometry: {
-                    x: word.bbox.x * 100, // Convert normalized (0-1) to percentage (0-100)
-                    y: word.bbox.y * 100, // Convert normalized (0-1) to percentage (0-100) 
-                    w: word.bbox.width * 100, // Convert normalized (0-1) to percentage (0-100)
-                    h: word.bbox.height * 100, // Convert normalized (0-1) to percentage (0-100)
+                    x: Math.max(0, Math.min(word.bbox.x * 100, 100)), // Convert normalized (0-1) to percentage (0-100)
+                    y: Math.max(0, Math.min(word.bbox.y * 100, 100)), // Convert normalized (0-1) to percentage (0-100) 
+                    w: Math.max(0.1, Math.min(word.bbox.width * 100, 100)), // Convert normalized (0-1) to percentage (0-100)
+                    h: Math.max(0.1, Math.min(word.bbox.height * 100, 100)), // Convert normalized (0-1) to percentage (0-100)
                   },
                 };
 

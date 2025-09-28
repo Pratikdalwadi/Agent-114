@@ -216,10 +216,16 @@ export function transformGroundingToPixels(
   documentWidth: number,
   documentHeight: number
 ): { x: number; y: number; width: number; height: number } {
+  // Ensure coordinates are properly bounded
+  const l = Math.max(0, Math.min(grounding.l, 1));
+  const t = Math.max(0, Math.min(grounding.t, 1));
+  const r = Math.max(l, Math.min(grounding.r, 1));
+  const b = Math.max(t, Math.min(grounding.b, 1));
+  
   return {
-    x: Math.round(grounding.l * documentWidth),
-    y: Math.round(grounding.t * documentHeight),
-    width: Math.round((grounding.r - grounding.l) * documentWidth),
-    height: Math.round((grounding.b - grounding.t) * documentHeight),
+    x: Math.round(l * documentWidth),
+    y: Math.round(t * documentHeight),
+    width: Math.round((r - l) * documentWidth),
+    height: Math.round((b - t) * documentHeight),
   };
 }
