@@ -22,16 +22,25 @@ export async function extractTextWithGemini(imageDataUrl: string): Promise<Gemin
     const base64Data = imageDataUrl.split(',')[1];
     
     const prompt = `
-Analyze this PDF page image and extract ALL text content with high precision. Please:
+Analyze this PDF page image and extract ALL text content with maximum precision. Focus on:
 
-1. Extract every piece of visible text, maintaining the original structure and formatting
-2. Identify different types of content (titles, headings, paragraphs, tables, lists)
-3. Preserve spatial relationships and reading order
-4. Return the results in a structured JSON format
+1. COMPLETE TEXT EXTRACTION: Extract every single piece of visible text including:
+   - Main content text
+   - Headers and titles
+   - Footnotes and captions
+   - Page numbers
+   - Table content
+   - Form fields
+   - Watermarks or stamps
+   - Any other visible text elements
+
+2. PRESERVE STRUCTURE: Maintain original formatting, line breaks, and spatial relationships
+
+3. CONTENT CLASSIFICATION: Identify different content types accurately
 
 Return a JSON object with this structure:
 {
-  "text": "complete extracted text with line breaks preserved",
+  "text": "ALL extracted text with proper line breaks and spacing preserved",
   "structuredData": {
     "title": "main title if present",
     "headings": ["array of headings"],
@@ -39,10 +48,10 @@ Return a JSON object with this structure:
     "tables": ["array of table content"],
     "lists": ["array of list items"]
   },
-  "confidence": 0.95
+  "confidence": 0.98
 }
 
-Focus on accuracy and completeness. Extract even small text elements like footnotes, captions, and page numbers.
+CRITICAL: Do not miss any text. Even small elements like page numbers, footnotes, and watermarks must be included.
 `;
 
     const imageParts = [
@@ -74,7 +83,7 @@ Focus on accuracy and completeness. Extract even small text elements like footno
             tables: [],
             lists: []
           },
-          confidence: parsed.confidence || 0.9
+          confidence: parsed.confidence || 0.95
         };
       }
     } catch (parseError) {
@@ -90,7 +99,7 @@ Focus on accuracy and completeness. Extract even small text elements like footno
         tables: [],
         lists: []
       },
-      confidence: 0.8
+      confidence: 0.85
     };
     
   } catch (error) {

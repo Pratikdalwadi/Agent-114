@@ -72,7 +72,7 @@ const EnhancedPDFProcessor = ({
       // Analyze document structure with complete text fallback
       const structureResult = await analyzeDocumentStructure(imageData, geminiResult.text);
       
-      console.log(`Gemini extracted ${geminiResult.text.length} characters with ${geminiResult.confidence * 100}% confidence`);
+      console.log(`🤖 Gemini extracted ${geminiResult.text.length} characters with ${(geminiResult.confidence * 100).toFixed(1)}% confidence`);
       
       // STEP 1: Try to extract text layer from PDF.js first (most accurate)
       let pdfTextItems: any[] = [];
@@ -80,7 +80,7 @@ const EnhancedPDFProcessor = ({
         try {
           const textContent = await pdfPage.getTextContent();
           pdfTextItems = textContent.items || [];
-          console.log(`📄 PDF.js extracted ${pdfTextItems.length} text items with native coordinates`);
+          console.log(`📄 PDF.js extracted ${pdfTextItems.length} text items from page ${pageNumber}`);
         } catch (error) {
           console.warn('⚠️ PDF.js text layer extraction failed:', error);
         }
@@ -178,56 +178,46 @@ const EnhancedPDFProcessor = ({
               height: textHeight / canvas.height,
             };
 
-            // Ensure normalized coordinates are properly bounded
-            normalizedBBox.x = Math.max(0, Math.min(normalizedBBox.x, 1));
-            normalizedBBox.y = Math.max(0, Math.min(normalizedBBox.y, 1));
-            normalizedBBox.width = Math.max(0.001, Math.min(normalizedBBox.width, 1 - normalizedBBox.x));
-            normalizedBBox.height = Math.max(0.001, Math.min(normalizedBBox.height, 1 - normalizedBBox.y));
-
             const word: Word = {
               text: item.str,
               bbox: normalizedBBox,
-              confidence: 0.95, // PDF text layer is very reliable
+              confidence: 0.98, // PDF text layer is very reliable
               fontFamily: item.fontName || 'Arial',
               fontSize: fontSize,
             };
 
             words.push(word);
 
-            // Create legacy chunk with precise geometry (PDF.js coordinates are already correct)
+            // Create legacy chunk with percentage-based geometry for compatibility
             const legacyChunk: LegacyTextChunk = {
               id: nanoid(),
               text: item.str,
               pageNumber: pageNumber,
               geometry: {
-                x: (x / canvas.width) * 100, // Convert to percentage for legacy compatibility
-                y: (y / canvas.height) * 100, // Don't flip Y - PDF.js coordinates are already correct
-                w: (textWidth / canvas.width) * 100,
-                h: (textHeight / canvas.height) * 100,
+                x: Math.max(0, Math.min(x, 100)), // Use calculated percentage coordinates
+                y: Math.max(0, Math.min(y, 100)), // Use calculated percentage coordinates
+                w: Math.max(0.1, Math.min(w, 100)),
+                h: Math.max(0.1, Math.min(h, 100)),
               },
             };
 
             legacyChunks.push(legacyChunk);
           }
         });
-        console.log(`✅ Created ${words.length} text chunks from PDF.js text layer`);
+        console.log(`✅ PDF.js: Created ${words.length} words and ${legacyChunks.length} legacy chunks`);
       }
       // Priority 2: Use OCR coordinates (good accuracy)
       else if (ocrData?.words && Array.isArray(ocrData.words)) {
-        console.log('🔍 Using enhanced OCR coordinates');
+        console.log(`🔍 Using enhanced OCR coordinates for page ${pageNumber}`);
         ocrData.words.forEach((ocrWord: any, wordIndex: number) => {
           if (ocrWord.text.trim() && ocrWord.bbox) {
-            // Use OCR coordinates with proper normalization and validation
+            // Normalize OCR coordinates to [0,1] range
             const normalizedBBox: BoundingBox = {
               x: Math.max(0, Math.min(ocrWord.bbox.x0 / canvas.width, 1)),
               y: Math.max(0, Math.min(ocrWord.bbox.y0 / canvas.height, 1)),
-              width: Math.max(0.001, Math.min((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width, 1)),
-              height: Math.max(0.001, Math.min((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height, 1)),
+              width: Math.max(0.001, Math.min((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width, 1 - (ocrWord.bbox.x0 / canvas.width))),
+              height: Math.max(0.001, Math.min((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height, 1 - (ocrWord.bbox.y0 / canvas.height))),
             };
-
-            // Ensure width and height don't exceed page bounds
-            normalizedBBox.width = Math.min(normalizedBBox.width, 1 - normalizedBBox.x);
-            normalizedBBox.height = Math.min(normalizedBBox.height, 1 - normalizedBBox.y);
 
             const word: Word = {
               text: ocrWord.text,
@@ -239,23 +229,23 @@ const EnhancedPDFProcessor = ({
 
             words.push(word);
 
-            // Create legacy chunk with validated geometry (convert to percentage with bounds checking)
+            // Create legacy chunk with percentage coordinates
             const legacyChunk: LegacyTextChunk = {
               id: nanoid(),
               text: ocrWord.text,
               pageNumber: pageNumber,
               geometry: {
-                x: Math.max(0, Math.min((ocrWord.bbox.x0 / canvas.width) * 100, 100)),
-                y: Math.max(0, Math.min((ocrWord.bbox.y0 / canvas.height) * 100, 100)),
-                w: Math.max(0.1, Math.min(((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width) * 100, 100)),
-                h: Math.max(0.1, Math.min(((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height) * 100, 100)),
+                x: normalizedBBox.x * 100, // Convert normalized to percentage
+                y: normalizedBBox.y * 100, // Convert normalized to percentage
+                w: normalizedBBox.width * 100, // Convert normalized to percentage
+                h: normalizedBBox.height * 100, // Convert normalized to percentage
               },
             };
 
             legacyChunks.push(legacyChunk);
           }
         });
-        console.log(`✅ Created ${words.length} text chunks from enhanced OCR`);
+        console.log(`✅ OCR: Created ${words.length} words and ${legacyChunks.length} legacy chunks`);
       }
 
       // STEP 4: Enhanced fallback coordinate generation if needed
@@ -841,15 +831,11 @@ const EnhancedPDFProcessor = ({
           if (ocrWord.text.trim() && ocrWord.bbox) {
             // Normalize coordinates to [0,1] range
             const normalizedBBox: BoundingBox = {
-              x: Math.max(0, Math.min(ocrWord.bbox.x0 / canvas.width, 1)),
-              y: Math.max(0, Math.min(ocrWord.bbox.y0 / canvas.height, 1)),
-              width: Math.max(0.001, Math.min((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width, 1)),
-              height: Math.max(0.001, Math.min((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height, 1)),
+              x: ocrWord.bbox.x0 / canvas.width,
+              y: ocrWord.bbox.y0 / canvas.height,
+              width: (ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width,
+              height: (ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height,
             };
-
-            // Ensure width and height don't exceed page bounds
-            normalizedBBox.width = Math.min(normalizedBBox.width, 1 - normalizedBBox.x);
-            normalizedBBox.height = Math.min(normalizedBBox.height, 1 - normalizedBBox.y);
 
             const word: Word = {
               text: ocrWord.text,
@@ -867,10 +853,10 @@ const EnhancedPDFProcessor = ({
               text: ocrWord.text,
               pageNumber: pageNumber,
               geometry: {
-                x: Math.max(0, Math.min((ocrWord.bbox.x0 / canvas.width) * 100, 100)),
-                y: Math.max(0, Math.min((ocrWord.bbox.y0 / canvas.height) * 100, 100)),
-                w: Math.max(0.1, Math.min(((ocrWord.bbox.x1 - ocrWord.bbox.x0) / canvas.width) * 100, 100)),
-                h: Math.max(0.1, Math.min(((ocrWord.bbox.y1 - ocrWord.bbox.y0) / canvas.height) * 100, 100)),
+                x: ocrWord.bbox.x0,
+                y: ocrWord.bbox.y0,
+                w: ocrWord.bbox.x1 - ocrWord.bbox.x0,
+                h: ocrWord.bbox.y1 - ocrWord.bbox.y0,
               },
             };
 
