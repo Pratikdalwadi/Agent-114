@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { upload } from "./middleware/upload";
 import { documentProcessor } from "./services/documentProcessor";
 import { ExportService } from "./services/exportService";
-import { insertDocumentSchema, insertExtractionJobSchema } from "@shared/schema";
+import { insertDocumentSchema, insertExtractionJobSchema } from "../shared/schema.js";
 import { z } from "zod";
 import path from "path";
 

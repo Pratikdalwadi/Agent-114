@@ -1,4 +1,4 @@
-import { IntermediateRepresentation, TextChunk, GroundingBox, Grounding, BoundingBox, Block, Line, Word } from "@shared/schema";
+import { IntermediateRepresentation, TextChunk, GroundingBox, Grounding, BoundingBox, Block, Line, Word } from "../shared/schema.js";
 import { nanoid } from "nanoid";
 
 /**

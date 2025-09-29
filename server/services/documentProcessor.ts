@@ -1,4 +1,4 @@
-import { ExtractionJob, ExtractionResult } from "@shared/schema";
+import { ExtractionJob, ExtractionResult } from "../shared/schema.js";
 import { createAIProvider, ExtractionOptions } from "./aiProvider";
 import { storage } from "../storage";
 import fs from "fs";

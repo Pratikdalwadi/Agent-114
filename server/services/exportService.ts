@@ -1,4 +1,4 @@
-import { ExtractionResult } from "@shared/schema";
+import { ExtractionResult } from "../shared/schema.js";
 
 export class ExportService {
   static exportToJSON(result: ExtractionResult, pretty: boolean = true): string {

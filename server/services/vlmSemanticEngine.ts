@@ -7,7 +7,7 @@ import {
   ExtractionResult,
   KeyValuePair,
   Table
-} from "@shared/schema";
+} from "../shared/schema.js";
 import { layoutEngine } from "./layoutEngine";
 
 /**

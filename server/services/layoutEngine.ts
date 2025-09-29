@@ -8,7 +8,7 @@ import {
   KeyValuePair,
   Table,
   TableCell 
-} from "@shared/schema";
+} from "../shared/schema.js";
 
 /**
  * Enhanced Layout Engine for Vision-Language Model aware document processing

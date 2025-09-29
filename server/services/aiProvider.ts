@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import fs from "fs";
-import { ExtractionResult, extractionResultSchema } from "@shared/schema";
+import { ExtractionResult, extractionResultSchema } from "../shared/schema.js";
 // @ts-ignore - pdf-parse-debugging-disabled doesn't have types
 import pdfParse from 'pdf-parse-debugging-disabled';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';

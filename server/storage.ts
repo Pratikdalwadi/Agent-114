@@ -1,4 +1,4 @@
-import { type User, type InsertUser, type Document, type InsertDocument, type ExtractionJob, type InsertExtractionJob, type SchemaTemplate, type InsertSchemaTemplate, users, documents, extractionJobs, schemaTemplates } from "@shared/schema";
+import { type User, type InsertUser, type Document, type InsertDocument, type ExtractionJob, type InsertExtractionJob, type SchemaTemplate, type InsertSchemaTemplate, users, documents, extractionJobs, schemaTemplates } from "../shared/schema.js";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq, sql, isNull, inArray } from "drizzle-orm";

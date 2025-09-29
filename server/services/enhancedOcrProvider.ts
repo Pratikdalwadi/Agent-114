@@ -1,5 +1,5 @@
 import { AIProvider, ExtractionOptions } from "./aiProvider";
-import { ExtractionResult, IntermediateRepresentation, Page, Word, Block, Line, Table, Shape } from "@shared/schema";
+import { ExtractionResult, IntermediateRepresentation, Page, Word, Block, Line, Table, Shape } from "../shared/schema.js";
 import { textChunkGroundingService } from "./textChunkGroundingService";
 import OpenAI from "openai";
 import fs from "fs";
