@@ -1,0 +1,69 @@
+That's an excellent and fundamental question about how AI "sees" and understands documents. It's a process that combines several technologies, primarily from the fields of **Computer Vision** and **Natural Language Processing**.
+
+Let's break down how an AI identifies written parts and blank parts on a PDF.
+
+The first and most important thing the AI must determine is: **What kind of PDF is it?**
+
+1.  **Text-Based (or "True") PDF:** This is a PDF created digitally (e.g., saving a Word document as a PDF). The text inside is already encoded as characters with specific fonts and coordinates. For the AI, this is the easy mode.
+2.  **Image-Based (or "Scanned") PDF:** This is a PDF created from a scanner or a camera. The entire page is just one big image. The AI can't read the text directly; it only sees pixels. This is the hard mode, where the real "AI vision" comes in.
+
+---
+
+### How AI Handles Each Type
+
+#### 1. For Text-Based PDFs (The Easy Way)
+
+In this case, the AI doesn't need to "see" the page. It can simply **parse the file's internal structure**.
+
+*   **A Digital Blueprint:** A text-based PDF contains a blueprint of the page. It stores information like: "The character 'H' is at position (x=50, y=100) using the Times New Roman font at size 12."
+*   **Identifying Text:** The AI reads this blueprint and extracts all the text objects and their coordinates. It knows exactly where every letter, word, and line is located.
+*   **Identifying Blank Space:** By definition, any area on the page that does **not** have a text or image object defined in its coordinates is a blank space. The AI can easily calculate these empty regions.
+
+**Analogy:** It's like reading a spreadsheet of coordinates for furniture in a room instead of looking at a photo of the room. You know exactly where everything is and where the empty floor is.
+
+---
+
+#### 2. For Image-Based PDFs (The Hard Way - Using AI Vision)
+
+This is where the magic happens, using a process called **Optical Character Recognition (OCR)**, which is a powerful application of AI.
+
+Here is the step-by-step process:
+
+**Step 1: Pre-processing the Image**
+The AI first cleans up the image to make it easier to analyze.
+*   **Deskewing:** If the document was scanned crooked, the AI straightens it.
+*   **Binarization:** It converts the image to black and white to make the text stand out clearly from the background.
+*   **Noise Reduction:** It removes random specks or shadows that could be mistaken for text.
+
+
+
+**Step 2: Layout Analysis (or Segmentation)**
+This is the crucial step that directly answers your question. The AI analyzes the page to identify different types of blocks. It essentially **draws invisible boxes** around different regions.
+
+*   It identifies blocks of text (paragraphs).
+*   It identifies lines within those blocks.
+*   It identifies words within those lines.
+*   It identifies images, tables, or charts.
+
+**How does it identify these blocks?** The AI is trained on millions of documents. It learns to recognize the patterns of text (consistent lines, spacing between words, character shapes) versus the patterns of empty space (large, contiguous areas of the background color).
+
+> **This is how it finds the blank parts:** The areas on the page that are *not* enclosed within any of these identified boxes (text, image, table) are classified as **blank space**.
+
+
+
+**Step 3: Character Recognition**
+Now that the AI has isolated the text blocks, it goes through them character by character.
+
+*   A machine learning model (often a Convolutional Neural Network or a Transformer) looks at the small image of each character.
+*   It compares this image to the vast library of characters it has learned during its training.
+*   It makes a prediction: "This pattern of pixels has a 99% probability of being the letter 'A'."
+
+**Step 4: Post-processing (Reconstruction)**
+The AI isn't done yet. It takes the raw sequence of recognized characters (e.g., "he|lo wcrld") and uses language models to make corrections. It knows that "wcrld" is likely a mistake and "world" is the correct word in the context of "hello." It then reconstructs the sentences and paragraphs.
+
+### Summary Table
+
+| Feature | How AI Identifies It | Technology Used |
+| :--- | :--- | :--- |
+| **Written Part** | **Text-Based PDF:** Reads the encoded text and its coordinates directly from the file. <br> **Image-Based PDF:** Identifies blocks of pixels that form lines and paragraphs, then recognizes characters within them. | **File Parsing** <br> **OCR, Layout Analysis, Computer Vision** |
+| **Blank Part** | **Text-Based PDF:** Identifies regions on the page's coordinate map that have no text/image objects. <br> **Image-Based PDF:** Identifies large, contiguous areas of the background color that are not classified as text, image, or table blocks. | **File Parsing** <br> **Layout Analysis, Computer Vision** |
